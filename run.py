@@ -5,8 +5,6 @@ import re
 import pickle
 from sklearn.model_selection import StratifiedKFold
 import utils
-import keras
-import models.MLP as MLP
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -85,7 +83,7 @@ def train(dataset, inputs, full_targets):
             y_train = tf.keras.utils.to_categorical(y_train, num_classes=n_classes)
             y_test = tf.keras.utils.to_categorical(y_test, num_classes=n_classes)
 
-            x = import_module('models.MLP')
+            x = import_module('models.' + ft_model)
             model = x.Model(hidden_dim, n_classes).to(device)
             # utils.init_network(model)
 
@@ -180,14 +178,18 @@ if __name__ == '__main__':
         n_layer,
         text_mode,
         embed_mode,
-        seedid,
+        ft_model,
+        jobid,
     ) = utils.parse_args_classifier()
 
-    print('dataset:{} | lr:{} | batch_size:{} | epochs:{} | embed_model:{} | n_layer:{} | text_mode:{} | embed_mode:{} | seedid:{}'.format(dataset, lr, batch_size, epochs,
-                                                              embed_model, n_layer, text_mode,
-                                                              embed_mode, seedid))
+    print(
+        'dataset:{} | lr:{} | batch_size:{} | epochs:{} | embed_model:{} | n_layer:{} | text_mode:{} | embed_mode:{} | seedid:{}'.format(
+            dataset, lr, batch_size, epochs,
+            embed_model, n_layer, text_mode,
+            embed_mode, jobid))
+
     n_classes = 2
-    utils.setup_seed(seedid)
+    utils.setup_seed(jobid)
 
     out_path = '/output/'
 

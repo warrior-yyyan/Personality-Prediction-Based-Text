@@ -115,11 +115,11 @@ def parse_args_main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dataset', type=str, default='essays')
     ap.add_argument('--token_len', type=int, default=512)
-    ap.add_argument('--batch_size', type=str, default=64)
+    ap.add_argument('--batch_size', type=int, default=128)
     ap.add_argument('--embed_model', type=str, default='deberta-v3-large')
     ap.add_argument('--out_dir', type=str, default='/output/')
-    ap.add_argument('--text_mode', type=str, default='512_head')
-    ap.add_argument('--embed_mode', type=str, default='cls')
+    ap.add_argument('--text_mode', type=str, default='256_mean_tail')
+    ap.add_argument('--embed_mode', type=str, default='mean')
     ap.add_argument('--local_model_path', type=str, default='/model/yyyan/deberta-v3-large')
     ap.add_argument('--local_tokenizer_path', type=str, default='/model/yyyan/deberta-v3-large/')
     args = ap.parse_args()
@@ -138,16 +138,18 @@ def parse_args_main():
 
 def parse_args_classifier():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--inp_dir', type=str, default='/data/yyyan/deberta-v3-large/')
+    ap.add_argument('--inp_dir', type=str, default='data/essays/')
     ap.add_argument('--dataset', type=str, default='essays')
     ap.add_argument('--lr', type=float, default=5e-4)
     ap.add_argument('--batch_size', type=int, default=128)
     ap.add_argument('--epochs', type=int, default=30)
     ap.add_argument('--embed_model', type=str, default='deberta-v3-large')
-    ap.add_argument('--n_layer', type=str, default='24')
+    # best layer 13 ~ 14
+    ap.add_argument('--n_layer', type=str, default='12')
     ap.add_argument('--text_mode', type=str, default='256_head_tail')
     ap.add_argument('--embed_mode', type=str, default='mean')
-    ap.add_argument('--seedid', type=int, default=0)
+    ap.add_argument('--ft_model', type=str, default='MLP')
+    ap.add_argument('--jobid', type=int, default=0)
     args = ap.parse_args()
     return (
         args.inp_dir,
@@ -159,7 +161,8 @@ def parse_args_classifier():
         args.n_layer,
         args.text_mode,
         args.embed_mode,
-        args.seedid,
+        args.ft_model,
+        args.jobid,
     )
 
 
