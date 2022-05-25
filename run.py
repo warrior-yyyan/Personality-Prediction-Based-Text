@@ -7,11 +7,17 @@ from sklearn.model_selection import StratifiedKFold
 import utils
 import keras
 import models.MLP as MLP
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from dataset import ClsDataset
 from torch.utils.data import DataLoader, Dataset
 import tensorflow as tf
+from importlib import import_module
+import torch.nn.functional as F
+from sklearn import metrics
+import warnings
+warnings.filterwarnings("ignore")
 
 parent_dir = os.path.dirname(os.getcwd())
 sys.path.insert(0, parent_dir)
@@ -56,7 +62,10 @@ def train(dataset, inputs, full_targets):
         trait_labels = ['EXT', 'NEU', 'AGR', 'CON', 'OPN']
 
     n_splits = 10
+
     expdata = {'acc': [], 'trait': [], 'fold': []}
+
+    final_acc = []
 
     for trait_idx in range(full_targets.shape[1]):
         targets = full_targets[:, trait_idx]
@@ -65,46 +74,99 @@ def train(dataset, inputs, full_targets):
         expdata['fold'].extend(np.arange(1, n_splits + 1))
 
         skf = StratifiedKFold(n_splits=n_splits, shuffle=False)
-
+        k = 0
+        tot_acc = []
+        tot_loss = []
         for train_index, test_index in skf.split(inputs, targets):
+            k += 1
             x_train, x_test = inputs[train_index], inputs[test_index]
             y_train, y_test = targets[train_index], targets[test_index]
-
             # converting to one-hot embedding
             y_train = tf.keras.utils.to_categorical(y_train, num_classes=n_classes)
             y_test = tf.keras.utils.to_categorical(y_test, num_classes=n_classes)
 
-            model = MLP.Model(hidden_dim, 512, n_classes)
-            criterion = nn.BCELoss()
+            x = import_module('models.MLP')
+            model = x.Model(hidden_dim, n_classes).to(device)
+            # utils.init_network(model)
+
+            criterion = nn.BCEWithLogitsLoss()
             optimizer = optim.Adam(model.parameters(), lr=lr)
 
-            # train
+            # prepare data
             train_dataset = ClsDataset(x_train, y_train, device)
             train_dataloader = DataLoader(
                 dataset=train_dataset,
                 batch_size=batch_size,
-                shuffle=False,
+                shuffle=True,
+            )
+            test_dataset = ClsDataset(x_test, y_test, device)
+            test_dataloader = DataLoader(
+                dataset=test_dataset,
+                batch_size=batch_size,
+                shuffle=True,
             )
 
-            model.train()
+            # train
+            acc_list = []
+            loss_list = []
+            report_list = []
             for epoch in range(epochs):
-                tol_loss = 0
-                for i, (trains, targets) in enumerate(train_dataloader, 0):
+                model.train()
+                train_loss = 0
+                for i, (trains, labels) in enumerate(train_dataloader, 0):
                     outpus = model(trains)
                     optimizer.zero_grad()
-                    loss = criterion(outpus, targets)
+                    loss = criterion(outpus, labels)
+                    train_loss += loss.item()
                     loss.backward()
                     optimizer.step()
 
-                    tol_loss += loss.item()
+                test_acc, test_loss, test_report, test_confusion = evaluate(model, test_dataloader)
+                acc_list.append(test_acc)
+                loss_list.append(test_loss)
+                report_list.append(test_report)
 
-                print(f'epoch : {1 + epoch}, loss : {tol_loss}')
+                # print(f'Epoch : {1 + epoch} -> Train Loss : {train_loss / len(train_dataloader)}, '
+                #       f'Test Acc : {test_acc}, Test Loss : {test_loss}')
+
+            best_acc = max(acc_list)
+            best_loss = loss_list[acc_list.index(max(acc_list))]
+            best_report = report_list[acc_list.index(max(acc_list))]
+
+            print(f'Trait : {trait_labels[trait_idx]}, No.{k} fold, Best Acc : {best_acc}, Best Loss : {best_loss}')
+
+            tot_acc.append(best_acc)
+            tot_loss.append(best_loss)
+
+        final_acc.append(sum(tot_acc) / n_splits)
+        print('='*100)
+        print(f'Trait : {trait_labels[trait_idx]}, {n_splits} fold Avg.Acc : {sum(tot_acc) / n_splits}, {n_splits} fold Avg.Loss : {sum(tot_loss) / n_splits}')
+        print('='*100)
+
+    print(f'Five Train Avg.Acc : {sum(final_acc) / len(final_acc)}')
 
 
+def evaluate(model, data):
+    model.eval()
+    test_loss = 0
+    true_all = np.array([], dtype=int)
+    predict_all = np.array([], dtype=int)
 
+    with torch.no_grad():
+        for i, (tests, labels) in enumerate(data):
+            out = model(tests)
+            loss = F.binary_cross_entropy_with_logits(out, labels)
+            test_loss += loss
+            true = torch.tensor(np.array([np.argmax(i) for i in labels.cpu().numpy()]), dtype=torch.int64)
+            predict = torch.max(out.data, 1)[1].cpu()
+            true_all = np.append(true_all, true)
+            predict_all = np.append(predict_all, predict)
 
+    acc = metrics.accuracy_score(true_all, predict_all)
+    report = metrics.classification_report(true_all, predict_all, target_names=['not', 'is'], digits=4)
+    confusion = metrics.confusion_matrix(true_all, predict_all)
 
-    
+    return acc, test_loss / len(data), report, confusion
 
 
 if __name__ == '__main__':
@@ -121,11 +183,12 @@ if __name__ == '__main__':
         seedid,
     ) = utils.parse_args_classifier()
 
-    print('{} : {} : {} : {} : {} : {} : {} : {} : {}'.format(dataset, lr, batch_size, epochs,
+    print('dataset:{} | lr:{} | batch_size:{} | epochs:{} | embed_model:{} | n_layer:{} | text_mode:{} | embed_mode:{} | seedid:{}'.format(dataset, lr, batch_size, epochs,
                                                               embed_model, n_layer, text_mode,
                                                               embed_mode, seedid))
     n_classes = 2
-    np.random.seed(seedid)
+    utils.setup_seed(seedid)
+
     out_path = '/output/'
 
     if re.search(r'base', embed_model):

@@ -1,10 +1,10 @@
 import torch.nn as nn
 
 class Model(nn.Module):
-    def __init__(self, input_dim, hidden_dim, n_classes):
+    def __init__(self, input_dim, n_classes):
         super(Model, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, n_classes)
+        self.fc1 = nn.Linear(input_dim, input_dim / 4)
+        self.fc2 = nn.Linear(input_dim / 8, n_classes)
         self.relu = nn.ReLU()
 
     def forward(self, x):

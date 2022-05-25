@@ -6,8 +6,8 @@ from utils import *
 
 class ClsDataset(Dataset):
     def __init__(self, inputs, targets, device):
-        self.inputs = torch.from_numpy(inputs).long().to(device)
-        self.targets = torch.from_numpy(targets).long().to(device)
+        self.inputs = torch.from_numpy(inputs).float().to(device)
+        self.targets = torch.from_numpy(targets).float().to(device)
 
     def __len__(self):
         return len(self.targets)

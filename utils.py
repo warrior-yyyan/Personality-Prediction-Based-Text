@@ -6,7 +6,8 @@ import csv
 import preprocessor as p
 import torch
 import random
-
+import torch
+import torch.nn as nn
 
 def preprocess_text(sentence):
     # remove hyperlinks, hashtags, smileys, emojies
@@ -137,15 +138,15 @@ def parse_args_main():
 
 def parse_args_classifier():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--inp_dir', type=str, default='/data/yyyan/deberta-v3-large-mean-256_head_tail/pkl_data/')
+    ap.add_argument('--inp_dir', type=str, default='/data/yyyan/deberta-v3-large/')
     ap.add_argument('--dataset', type=str, default='essays')
     ap.add_argument('--lr', type=float, default=5e-4)
     ap.add_argument('--batch_size', type=int, default=128)
-    ap.add_argument('--epochs', type=int, default=20)
+    ap.add_argument('--epochs', type=int, default=30)
     ap.add_argument('--embed_model', type=str, default='deberta-v3-large')
-    ap.add_argument('--n_layer', type=str, default='12')
-    ap.add_argument('--text_mode', type=str, default='512_head')
-    ap.add_argument('--embed_mode', type=str, default='cls')
+    ap.add_argument('--n_layer', type=str, default='24')
+    ap.add_argument('--text_mode', type=str, default='256_head_tail')
+    ap.add_argument('--embed_mode', type=str, default='mean')
     ap.add_argument('--seedid', type=int, default=0)
     args = ap.parse_args()
     return (
@@ -170,6 +171,19 @@ def setup_seed(seed):
     torch.backends.cudnn.deterministic = True
 
 
+def init_network(model, method='xavier'):
+    for name, w in model.named_parameters():
+        if 'weight' in name:
+            if method == 'xavier':
+                nn.init.xavier_normal_(w)
+            elif method == 'kaiming':
+                nn.init.kaiming_normal_(w)
+            else:
+                nn.init.normal_(w)
+        elif 'bias' in name:
+            nn.init.constant_(w, 0)
+        else:
+            pass
 
 
 
