@@ -200,4 +200,4 @@ if __name__ == '__main__':
         hidden_dim = 1024
         
     inputs, full_targets = get_inputs(inp_dir, dataset, embed_model, embed_mode, text_mode, n_layer)
-    df = train(dataset, inputs, full_targets)
+    train(dataset, inputs, full_targets)
