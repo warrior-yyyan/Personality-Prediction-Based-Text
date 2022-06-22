@@ -2,3 +2,5 @@
 *.pkl
 __pycache__/
 models/__pycache__/
+.ipynb_checkpoints
+*/.ipynb_checkpoints

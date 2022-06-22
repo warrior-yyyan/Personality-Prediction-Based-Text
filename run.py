@@ -8,6 +8,7 @@ import utils
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim import lr_scheduler
 from dataset import ClsDataset
 from torch.utils.data import DataLoader, Dataset
 import tensorflow as tf
@@ -89,6 +90,8 @@ def train(dataset, inputs, full_targets):
 
             criterion = nn.BCEWithLogitsLoss()
             optimizer = optim.Adam(model.parameters(), lr=lr)
+            
+            scheduler = lr_scheduler.StepLR(optimizer, 50, 0.5)
 
             # prepare data
             train_dataset = ClsDataset(x_train, y_train, device)
@@ -101,7 +104,7 @@ def train(dataset, inputs, full_targets):
             test_dataloader = DataLoader(
                 dataset=test_dataset,
                 batch_size=batch_size,
-                shuffle=True,
+                shuffle=False,
             )
 
             # train
@@ -111,6 +114,9 @@ def train(dataset, inputs, full_targets):
             for epoch in range(epochs):
                 model.train()
                 train_loss = 0
+                
+                scheduler.step()
+                
                 for i, (trains, labels) in enumerate(train_dataloader, 0):
                     outpus = model(trains)
                     optimizer.zero_grad()
@@ -183,7 +189,7 @@ if __name__ == '__main__':
     ) = utils.parse_args_classifier()
 
     print(
-        'dataset:{} | lr:{} | batch_size:{} | epochs:{} | embed_model:{} | n_layer:{} | text_mode:{} | embed_mode:{} | seedid:{}'.format(
+        'dataset:{} | lr:{} | batch_size:{} | epochs:{} | embed_model:{} | n_layer:{} | text_mode:{} | embed_mode:{} | jobid:{}'.format(
             dataset, lr, batch_size, epochs,
             embed_model, n_layer, text_mode,
             embed_mode, jobid))

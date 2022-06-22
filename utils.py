@@ -118,7 +118,7 @@ def parse_args_main():
     ap.add_argument('--batch_size', type=int, default=128)
     ap.add_argument('--embed_model', type=str, default='deberta-v3-large')
     ap.add_argument('--out_dir', type=str, default='/output/')
-    ap.add_argument('--text_mode', type=str, default='256_mean_tail')
+    ap.add_argument('--text_mode', type=str, default='256_head_tail')
     ap.add_argument('--embed_mode', type=str, default='mean')
     ap.add_argument('--local_model_path', type=str, default='/model/yyyan/deberta-v3-large')
     ap.add_argument('--local_tokenizer_path', type=str, default='/model/yyyan/deberta-v3-large/')
@@ -138,14 +138,14 @@ def parse_args_main():
 
 def parse_args_classifier():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--inp_dir', type=str, default='data/essays/')
+    ap.add_argument('--inp_dir', type=str, default='/data/yyyan/deberta-v3-large/')
     ap.add_argument('--dataset', type=str, default='essays')
     ap.add_argument('--lr', type=float, default=5e-4)
     ap.add_argument('--batch_size', type=int, default=128)
-    ap.add_argument('--epochs', type=int, default=30)
+    ap.add_argument('--epochs', type=int, default=100)
     ap.add_argument('--embed_model', type=str, default='deberta-v3-large')
-    # best layer 13 ~ 14
-    ap.add_argument('--n_layer', type=str, default='12')
+    # best layer 13 ~ 14 ~ 20 < 21 ~ 22
+    ap.add_argument('--n_layer', type=str, default='21')
     ap.add_argument('--text_mode', type=str, default='256_head_tail')
     ap.add_argument('--embed_mode', type=str, default='mean')
     ap.add_argument('--ft_model', type=str, default='MLP')
@@ -187,12 +187,4 @@ def init_network(model, method='xavier'):
             nn.init.constant_(w, 0)
         else:
             pass
-
-
-
-
-
-
-
-
 

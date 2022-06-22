@@ -27,7 +27,7 @@ class MyDataset(Dataset):
 
         author_ids = torch.from_numpy(np.array(author_ids)).long().to(device)
         input_ids = torch.from_numpy(np.array(input_ids)).long().to(device)
-        targets = torch.from_numpy(np.array(targets)).long().to(device)
+        targets = torch.from_numpy(np.array(targets))
 
         self.author_ids = author_ids
         self.input_ids = input_ids

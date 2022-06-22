@@ -57,8 +57,9 @@ def get_model(embed_model, local_model_path=None, local_tokenizer_path=None):
     elif embed_model == 'deberta-v3-large':
         n_hl = 24
         hidden_dim = 1024
-        MODEL = (AutoModel, AutoTokenizer, 'deberta-v3-large')
-
+        # MODEL = (AutoModel, AutoTokenizer, 'deberta-v3-large')
+        MODEL = (DebertaV2Model, DebertaV2Tokenizer, 'deberta-v3-large')
+        
     elif embed_model == 'albert-base':
         n_hl = 12
         hidden_dim = 768
@@ -105,7 +106,6 @@ def extract_features(input_ids, text_mode, n_hl):
             # deberta-v2/3 : tmp.append((output[1][i + 1].cpu().numpy()).mean(axis=1))
 
             tmp.append((output[1][i + 1].cpu().numpy()).mean(axis=1))
-            print(output.shape)
 
     hidden_features.append(np.array(tmp))
 
@@ -130,6 +130,11 @@ if __name__ == '__main__':
 
     # n_hl : num of hidden layer
     model, tokenizer, n_hl, hidden_dim = get_model(embed_model, local_model_path, local_tokenizer_path)
+    
+    # add noise -> from acl2022-short
+    for name ,para in model.named_parameters ():
+        model.state_dict()[name][:] +=(torch.rand(para.size())-0.5)*0.2*torch.std(para)
+    
 
     datafile = 'data/essays/essays.csv' if dataset == 'essays' else 'data/kaggle/kaggle.csv'
 
@@ -138,7 +143,6 @@ if __name__ == '__main__':
         dataset=dataset_,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=0,
     )
 
     print("starting to extract Pretrained Language Model embeddings...")
