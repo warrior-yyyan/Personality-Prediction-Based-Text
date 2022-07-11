@@ -1,7 +1,7 @@
 import numpy as np
 from torch.utils.data import Dataset
 import torch
-from utils import *
+from utils import process_data
 
 
 class ClsDataset(Dataset):
@@ -19,11 +19,13 @@ class ClsDataset(Dataset):
 class MyDataset(Dataset):
     def __init__(self, dataset, tokenizer, token_len, device, text_mode, datafile):
         if dataset == 'essays':
-            author_ids, input_ids, targets = essays_embeddings(
+            author_ids, input_ids, targets = process_data.essays_embeddings(
                 datafile, tokenizer, token_len, text_mode
             )
         elif dataset == 'kaggle':
-            pass
+            author_ids, input_ids, targets = process_data.kaggle_embeddings(
+                datafile, tokenizer, token_len
+            )
 
         author_ids = torch.from_numpy(np.array(author_ids)).long().to(device)
         input_ids = torch.from_numpy(np.array(input_ids)).long().to(device)

@@ -1,13 +1,9 @@
 import numpy as np
-import argparse
 import pandas as pd
 import re
 import csv
 import preprocessor as p
-import torch
-import random
-import torch
-import torch.nn as nn
+
 
 def preprocess_text(sentence):
     # remove hyperlinks, hashtags, smileys, emojies
@@ -15,6 +11,7 @@ def preprocess_text(sentence):
     # Remove hyperlinks
     sentence = re.sub(r'http\S+', ' ', sentence)
     sentence = re.sub(r'\s+', ' ', sentence)
+    # remove kaggle.csv '|||'
     sentence = re.sub(r'\|\|\|', ' ', sentence)
     return sentence
 
@@ -111,80 +108,67 @@ def essays_embeddings(datafile, tokenizer, token_len, text_mode):
     return author_ids, input_ids, targets
 
 
-def parse_args_main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--dataset', type=str, default='essays')
-    ap.add_argument('--token_len', type=int, default=512)
-    ap.add_argument('--batch_size', type=int, default=128)
-    ap.add_argument('--embed_model', type=str, default='deberta-v3-large')
-    ap.add_argument('--out_dir', type=str, default='/output/')
-    ap.add_argument('--text_mode', type=str, default='256_head_tail')
-    ap.add_argument('--embed_mode', type=str, default='mean')
-    ap.add_argument('--local_model_path', type=str, default='/model/yyyan/deberta-v3-large')
-    ap.add_argument('--local_tokenizer_path', type=str, default='/model/yyyan/deberta-v3-large/')
-    args = ap.parse_args()
-    return (
-        args.dataset,
-        args.token_len,
-        args.batch_size,
-        args.embed_model,
-        args.out_dir,
-        args.text_mode,
-        args.embed_mode,
-        args.local_model_path,
-        args.local_tokenizer_path,
-    )
+def load_kaggle_df(datafile):
+    with open(datafile, "rt", encoding="utf-8") as csvf:
+        csvreader = csv.reader(csvf, delimiter=",", quotechar='"')
+        first_line = True
+        df = pd.DataFrame(columns=["user", "text", "E", "N", "F", "J"])
+        for line in csvreader:
+            if first_line:
+                first_line = False
+                continue
+
+            text = line[1]
+
+            df = df.append(
+                {
+                    "user": line[3],
+                    "text": text,
+                    "E": 1 if line[0][0] == "E" else 0,
+                    "N": 1 if line[0][1] == "N" else 0,
+                    "F": 1 if line[0][2] == "F" else 0,
+                    "J": 1 if line[0][3] == "J" else 0,
+                },
+                ignore_index=True,
+            )
+
+    print("E : ", df["E"].value_counts())
+    print("N : ", df["N"].value_counts())
+    print("F : ", df["F"].value_counts())
+    print("J : ", df["J"].value_counts())
+
+    return df
 
 
-def parse_args_classifier():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--inp_dir', type=str, default='/data/yyyan/deberta-v3-large/')
-    ap.add_argument('--dataset', type=str, default='essays')
-    ap.add_argument('--lr', type=float, default=5e-4)
-    ap.add_argument('--batch_size', type=int, default=128)
-    ap.add_argument('--epochs', type=int, default=100)
-    ap.add_argument('--embed_model', type=str, default='deberta-v3-large')
-    # best layer 13 ~ 14 ~ 20 < 21 ~ 22
-    ap.add_argument('--n_layer', type=str, default='21')
-    ap.add_argument('--text_mode', type=str, default='256_head_tail')
-    ap.add_argument('--embed_mode', type=str, default='mean')
-    ap.add_argument('--ft_model', type=str, default='MLP')
-    ap.add_argument('--jobid', type=int, default=0)
-    args = ap.parse_args()
-    return (
-        args.inp_dir,
-        args.dataset,
-        args.lr,
-        args.batch_size,
-        args.epochs,
-        args.embed_model,
-        args.n_layer,
-        args.text_mode,
-        args.embed_mode,
-        args.ft_model,
-        args.jobid,
-    )
+def kaggle_embeddings(datafile, tokenizer, token_length):
+    hidden_features = []
+    targets = []
+    token_len = []
+    input_ids = []
+    author_ids = []
 
+    df = load_kaggle_df(datafile)
+    cnt = 0
+    for ind in df.index:
 
-def setup_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
+        text = preprocess_text(df["text"][ind])
+        tokens = tokenizer.tokenize(text)
+        token_len.append(len(tokens))
+        token_ids = tokenizer.encode(
+            tokens,
+            add_special_tokens=True,
+            max_length=token_length,
+            pad_to_max_length=True,
+        )
+        if cnt < 10:
+            print(tokens[:10])
 
+        input_ids.append(token_ids)
+        targets.append([df["E"][ind], df["N"][ind], df["F"][ind], df["J"][ind]])
+        author_ids.append(int(df["user"][ind]))
+        cnt += 1
 
-def init_network(model, method='xavier'):
-    for name, w in model.named_parameters():
-        if 'weight' in name:
-            if method == 'xavier':
-                nn.init.xavier_normal_(w)
-            elif method == 'kaiming':
-                nn.init.kaiming_normal_(w)
-            else:
-                nn.init.normal_(w)
-        elif 'bias' in name:
-            nn.init.constant_(w, 0)
-        else:
-            pass
+    print("average length : ", int(np.mean(token_len)))
+    author_ids = np.array(author_ids)
 
+    return author_ids, input_ids, targets

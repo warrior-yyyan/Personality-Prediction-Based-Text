@@ -4,24 +4,27 @@ import numpy as np
 import re
 import pickle
 from sklearn.model_selection import StratifiedKFold
-import utils
+import utils.parse_args
+from utils import general_utils, parse_args, process_data
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
-from dataset import ClsDataset
+from datasets import ClsDataset
 from torch.utils.data import DataLoader, Dataset
 import tensorflow as tf
 from importlib import import_module
 import torch.nn.functional as F
 from sklearn import metrics
 import warnings
-warnings.filterwarnings("ignore")
+from torch.utils.tensorboard import SummaryWriter
 
+warnings.filterwarnings("ignore")
 parent_dir = os.path.dirname(os.getcwd())
 sys.path.insert(0, parent_dir)
 sys.path.insert(0, os.getcwd())
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 def get_inputs(inp_dir, dataset, embed_model, embed_mode, text_mode, n_layer):
     
@@ -66,6 +69,8 @@ def train(dataset, inputs, full_targets):
 
     final_acc = []
 
+    # writer = SummaryWriter('logs')
+
     for trait_idx in range(full_targets.shape[1]):
         targets = full_targets[:, trait_idx]
 
@@ -91,9 +96,8 @@ def train(dataset, inputs, full_targets):
             criterion = nn.BCEWithLogitsLoss()
             optimizer = optim.Adam(model.parameters(), lr=lr)
             
-            scheduler = lr_scheduler.StepLR(optimizer, 50, 0.5)
+            # scheduler = lr_scheduler.StepLR(optimizer, 50, 0.5)
 
-            # prepare data
             train_dataset = ClsDataset(x_train, y_train, device)
             train_dataloader = DataLoader(
                 dataset=train_dataset,
@@ -111,33 +115,42 @@ def train(dataset, inputs, full_targets):
             acc_list = []
             loss_list = []
             report_list = []
+            steps = 0
             for epoch in range(epochs):
                 model.train()
                 train_loss = 0
                 
-                scheduler.step()
+                # scheduler.step()
                 
                 for i, (trains, labels) in enumerate(train_dataloader, 0):
-                    outpus = model(trains)
+                    outputs = model(trains)
                     optimizer.zero_grad()
-                    loss = criterion(outpus, labels)
+                    loss = criterion(outputs, labels)
                     train_loss += loss.item()
                     loss.backward()
                     optimizer.step()
+
+                    acc_tag = 'Acc/train' + '_' + trait_labels[trait_idx] + '_fold:' + str(k)
+                    loss_tag = 'Loss/train' + '_' + trait_labels[trait_idx] + '_fold:' + str(k)
+                    # writer.add_scalar(loss_tag, loss.item(), steps)
+
+                    steps += 1
 
                 test_acc, test_loss, test_report, test_confusion = evaluate(model, test_dataloader)
                 acc_list.append(test_acc)
                 loss_list.append(test_loss)
                 report_list.append(test_report)
 
-                # print(f'Epoch : {1 + epoch} -> Train Loss : {train_loss / len(train_dataloader)}, '
-                #       f'Test Acc : {test_acc}, Test Loss : {test_loss}')
+                test_acc_tag = 'Acc/test' + '_' + trait_labels[trait_idx] + '_fold:' + str(k)
+                test_loss_tag = 'Loss/test' + '_' + trait_labels[trait_idx] + '_fold:' + str(k)
+                # writer.add_scalar(test_acc_tag, test_acc, epoch)
+                # writer.add_scalar(test_loss_tag, test_loss, epoch)
 
             best_acc = max(acc_list)
             best_loss = loss_list[acc_list.index(max(acc_list))]
             best_report = report_list[acc_list.index(max(acc_list))]
 
-            print(f'Trait : {trait_labels[trait_idx]}, No.{k} fold, Best Acc : {best_acc}, Best Loss : {best_loss}')
+            print(f'Trait : {trait_labels[trait_idx]}, No.{k} fold, Test Acc : {best_acc}, Test Loss : {best_loss}')
 
             tot_acc.append(best_acc)
             tot_loss.append(best_loss)
@@ -147,6 +160,7 @@ def train(dataset, inputs, full_targets):
         print(f'Trait : {trait_labels[trait_idx]}, {n_splits} fold Avg.Acc : {sum(tot_acc) / n_splits}, {n_splits} fold Avg.Loss : {sum(tot_loss) / n_splits}')
         print('='*100)
 
+    # writer.close()
     print(f'Five Train Avg.Acc : {sum(final_acc) / len(final_acc)}')
 
 
@@ -186,7 +200,7 @@ if __name__ == '__main__':
         embed_mode,
         ft_model,
         jobid,
-    ) = utils.parse_args_classifier()
+    ) = parse_args.parse_args_classifier()
 
     print(
         'dataset:{} | lr:{} | batch_size:{} | epochs:{} | embed_model:{} | n_layer:{} | text_mode:{} | embed_mode:{} | jobid:{}'.format(
@@ -195,7 +209,7 @@ if __name__ == '__main__':
             embed_mode, jobid))
 
     n_classes = 2
-    utils.setup_seed(jobid)
+    general_utils.setup_seed(jobid)
 
     out_path = '/output/'
 

@@ -4,13 +4,11 @@ import numpy as np
 import pickle
 import time
 from pathlib import Path
-
 import torch
 from torch.utils.data import DataLoader, Dataset
 from transformers import *
-
-from dataset import MyDataset
-from utils import *
+from datasets import MyDataset
+from utils import parse_args
 
 sys.path.insert(0, os.getcwd())
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -121,7 +119,7 @@ if __name__ == '__main__':
         embed_mode,
         local_model_path,
         local_tokenizer_path,
-    ) = parse_args_main()
+    ) = parse_args.parse_args_main()
     print(
         '{} | {} | {} | {} | {} | {} | {} | {} | {}'.format(dataset, token_len, batch_size,
                                                             embed_model, out_dir, text_mode, embed_mode,
@@ -132,11 +130,16 @@ if __name__ == '__main__':
     model, tokenizer, n_hl, hidden_dim = get_model(embed_model, local_model_path, local_tokenizer_path)
     
     # add noise -> from acl2022-short
-    for name ,para in model.named_parameters ():
-        model.state_dict()[name][:] +=(torch.rand(para.size())-0.5)*0.2*torch.std(para)
-    
+    # for name ,para in model.named_parameters ():
+    #     model.state_dict()[name][:] += (torch.rand(para.size())-0.5)*0.2*torch.std(para)
 
-    datafile = 'data/essays/essays.csv' if dataset == 'essays' else 'data/kaggle/kaggle.csv'
+    datafile = ''
+    if dataset == 'essays':
+        datafile = 'data/essays/essays.csv'
+    elif dataset == 'kaggle':
+        datafile = 'data/kaggle/kaggle.csv'
+    else:
+        pass
 
     dataset_ = MyDataset(dataset, tokenizer, token_len, device, text_mode, datafile)
     dataloader_ = DataLoader(
